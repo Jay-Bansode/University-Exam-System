@@ -83,7 +83,14 @@ export function AppLayout() {
         {navItems.length > 1 && (
           <nav
             aria-label="Sections"
-            className="mx-auto max-w-6xl overflow-x-auto px-4 sm:px-6"
+            // `-mb-px` sits here rather than on the links. It shortens the header's
+            // content box by 1px so the header's bottom border lands inside the tab row,
+            // and the active tab's border paints over it — an ancestor's border paints
+            // before a descendant's. Putting it on the links instead makes each link
+            // overhang this container by 1px, and because `overflow-x-auto` forces
+            // `overflow-y` from `visible` to `auto`, that 1px renders a stray vertical
+            // scrollbar on platforms with space-taking scrollbars.
+            className="mx-auto -mb-px max-w-6xl overflow-x-auto px-4 sm:px-6"
           >
             <ul className="flex gap-1">
               {navItems.map((item) => (
@@ -94,7 +101,7 @@ export function AppLayout() {
                     // would otherwise highlight two tabs at once.
                     end
                     className={({ isActive }) =>
-                      `-mb-px inline-block border-b-2 px-3 py-2 text-sm font-medium transition ${
+                      `inline-block border-b-2 px-3 py-2 text-sm font-medium transition ${
                         isActive
                           ? 'border-brand-600 text-brand-700'
                           : 'border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900'
