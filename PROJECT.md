@@ -678,9 +678,15 @@ which matters because Render's free tier has no persistent disk.
 
 **The round trip is now exercised end to end against the live API.** A signature was
 requested from `/api/uploads/photo-signature` as a student and used to POST an image
-directly to `api.cloudinary.com`; Cloudinary accepted it and stored the file under
-`ues/student-photos`. The signing scheme in `createUploadSignature` is therefore correct,
-not merely plausible.
+directly to `api.cloudinary.com`; Cloudinary accepted it, stored the file under
+`ues/student-photos`, and the returned `secure_url` fetched back as `image/png`. Both
+halves are confirmed — signing *and* delivery — so the signing scheme in
+`createUploadSignature` is correct, not merely plausible.
+
+Deletion is signed the same way (`public_id` + `timestamp`, SHA-1 with the secret
+appended), which is how the test assets were removed afterwards. Note that a deleted
+asset's URL keeps returning 200 from the CDN edge until its 30-day `max-age` expires; the
+stored asset is gone regardless.
 
 The three variables remain optional together. Without them the API answers
 `configured: false`, the photo field is hidden, and name and date-of-birth corrections
@@ -821,11 +827,11 @@ from both `/users` routes and reads their own record through `/auth/me`.
 | `NODE_ENV` | no | `development` \| `test` \| `production` |
 | `PORT` | no | Defaults to 5000. Render sets this itself. |
 | `MONGODB_URI` | **yes** | Boot fails without it |
-| `CORS_ORIGINS` | no | Comma-separated exact origins, no trailing slash |
+| `CORS_ORIGINS` | no locally, **yes in production** | Comma-separated exact origins, no trailing slash. Defaults to `http://localhost:5173`, so leaving it unset on Render silently blocks the deployed client |
 | `JWT_ACCESS_SECRET` | **yes** | Minimum 32 characters. **Use a different value in production.** Generate with `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
 | `ACCESS_TOKEN_MINUTES` | no | Default 15 |
 | `REFRESH_TOKEN_DAYS` | no | Default 7 |
-| `SEED_DEMO_PASSWORD` | no | Default `Demo@12345`. Published on the login page by design |
+| `SEED_DEMO_PASSWORD` | no | Default `Demo@12345`. Published on the login page by design. **Must match the value the database was seeded with** — `/api/auth/demo-accounts` serves this string straight to the login page, so a mismatch publishes credentials that silently fail |
 | `CLOUDINARY_CLOUD_NAME` | no | All three are optional **together**. Absent means photo uploads are disabled and the rest of the correction workflow still works |
 | `CLOUDINARY_API_KEY` | no | Sent to the browser as part of a signed upload |
 | `CLOUDINARY_API_SECRET` | no | **Never leaves the server.** Signs upload requests |
@@ -892,6 +898,66 @@ build with the global npm directory stripped from `PATH` to see the real behavio
 
 **The order matters.** Deploy the API first, then the client with the API URL, then add
 the Vercel origin to the API's `CORS_ORIGINS` and redeploy the API.
+
+### Where production configuration lives
+
+No secret is in this repository. `.env` and `.env.local` are git-ignored and only the
+`.env.example` files are tracked.
+
+| Value | Set in | Notes |
+|---|---|---|
+| `MONGODB_URI` | Render environment | Atlas SRV string with `/university-exam-system` before the `?` |
+| `JWT_ACCESS_SECRET` | Render environment | Distinct from the local development value |
+| `CORS_ORIGINS` | Render environment | The Vercel production origin, exactly |
+| `SEED_DEMO_PASSWORD` | Render environment | Must equal the value used when seeding |
+| `CLOUDINARY_*` | Render environment | Cloud `jvqvvl3p`; the secret never leaves the server |
+| `VITE_API_BASE_URL` | Vercel environment | Compiled into the bundle, therefore public |
+
+An environment-variable change on Render needs only **Save and deploy** — the server reads
+its environment once at boot, so a restart suffices and a full rebuild is wasted time.
+
+### Rotating credentials
+
+Each of these can be replaced without code changes. Only the Cloudinary cloud name is
+baked into behaviour, through `isOwnCloudinaryUrl`.
+
+- **Cloudinary key/secret** — Settings → API Keys → Generate New API Key, update the two
+  Render variables, then deactivate the old key. The cloud name stays the same, so stored
+  photo URLs and the URL guard keep working.
+- **`JWT_ACCESS_SECRET`** — replacing it invalidates every issued access token, signing all
+  users out at their next request. Harmless here; worth knowing before doing it casually.
+- **Atlas password** — Database Access → Edit → Edit Password, then update `MONGODB_URI`.
+
+The Cloudinary API secret is the one worth guarding: it signs uploads, and anyone holding
+it can upload to or delete from the account. It never reaches the browser — the client
+receives only the cloud name, API key, timestamp and a computed signature. The usual way
+it escapes is a screenshot of a dashboard or an environment page, not the code.
+
+### Verifying a deployment
+
+Run these against the live URLs, not localhost. The first request after 15 minutes idle
+takes around a minute; that is the Render free tier, not a fault.
+
+1. **Health** — `/api/health` reports `database: "connected"` and
+   `environment: "production"`.
+2. **The client is really yours.** Compare the served `<title>` against
+   `client/dist/index.html`, and grep the deployed `assets/client-*.js` chunk for the API
+   host. Do not identify a deployment by eye; see the Vercel warnings above.
+3. **CORS** — a request carrying the production `Origin` comes back with a matching
+   `access-control-allow-origin` and `access-control-allow-credentials: true`, and the
+   `OPTIONS` preflight returns 204.
+4. **Cookie flags** — login returns `Set-Cookie: … HttpOnly; Secure; SameSite=None;
+   Path=/api/auth`. Anything less and cross-site refresh fails silently.
+5. **Silent refresh** — `POST /api/auth/refresh` with only the cookie returns a new access
+   token. This is what makes a page reload keep the session.
+6. **Tenant isolation** — one college's clerk reading another's record by id gets **404**.
+7. **Role guard** — a clerk calling `/api/statistics` gets **403**. The contrast with the
+   404 above is deliberate: a cross-tenant 403 would confirm the record exists, whereas
+   refusing a role leaks nothing.
+8. **Photographs** — `/api/uploads/photo-signature` reports `configured: true`; the
+   signature uploads successfully; and the returned `secure_url` fetches back as an image.
+   Then confirm a `photoUrl` on any other host is rejected **400**.
+9. **SPA routing** — a nested path such as `/clerk/forms` returns the app, not a 404.
 
 **Seeding Atlas.** Run `npm run seed` from a developer machine with `server/.env`
 temporarily pointed at the Atlas URI; the seed runs through `tsx`, a devDependency, and is
@@ -1443,3 +1509,26 @@ Render cold start and explain the delay rather than appearing broken.
   project's domain and blocking the actual client.
 - Confirmed the production bundle compiles in `https://ues-api.onrender.com` with
   `withCredentials`, and contains no `localhost:5000` fallback.
+
+### 2026-09-13 — Production verification and operational notes
+
+- Full verification pass against the live URLs from the real browser origin: health,
+  CORS and preflight, login cookie flags, silent refresh from the cookie alone,
+  cross-tenant **404**, role-guard **403** on `/api/statistics`, and photographs
+  reporting `configured: true`.
+- **Cloudinary delivery confirmed, not just upload.** A freshly signed upload's
+  `secure_url` was fetched back as `image/png`. Test assets were then removed with signed
+  `destroy` calls; a deleted URL still answers 200 from the CDN edge until its 30-day
+  cache expires.
+- Section 9 gained three subsections it was missing: where production configuration
+  lives, how to rotate each credential, and a repeatable deployment verification
+  checklist.
+- Clarified two environment variables whose "not required" status is misleading in
+  production: `CORS_ORIGINS` defaults to localhost and silently blocks the deployed
+  client if unset, and `SEED_DEMO_PASSWORD` must match the value the database was seeded
+  with, because `/api/auth/demo-accounts` publishes it to the login page.
+- **Fixed the README's local setup, which could not work as written.** It omitted
+  `npm run seed`, leaving an empty database and a login page with no demo accounts, and
+  it did not mention that `JWT_ACCESS_SECRET` ships empty in `.env.example` while the
+  schema requires at least 32 characters — so `cp .env.example .env && npm run dev:server`
+  failed at startup. The clone URL is now the real repository.

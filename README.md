@@ -33,8 +33,8 @@ Zod 4 · MongoDB — Vitest · ESLint · Prettier
 Requires Node.js 20.11+ and Docker.
 
 ```bash
-git clone <this-repo>
-cd university-exam-system
+git clone https://github.com/Jay-Bansode/University-Exam-System.git
+cd University-Exam-System
 
 docker compose up -d                 # MongoDB on :27017
 npm install
@@ -42,9 +42,17 @@ npm install
 cp server/.env.example server/.env         # defaults already point at local MongoDB
 cp client/.env.example client/.env.local
 
+# JWT_ACCESS_SECRET ships empty and must be at least 32 characters,
+# or the server refuses to start. Generate one and paste it into server/.env:
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+
+npm run seed                         # two colleges + demo accounts for all five roles
 npm run dev:server                   # API    → http://localhost:5000
 npm run dev:client                   # client → http://localhost:5173
 ```
+
+Without `npm run seed` the database is empty and the login page has no demo accounts to
+offer.
 
 Confirm the API is healthy:
 
