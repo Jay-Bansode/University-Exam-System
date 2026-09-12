@@ -14,10 +14,16 @@ A multi-tenant examination management system for an **affiliated university** an
 The university sets a central curriculum and controls exam registration windows;
 each affiliated college teaches that curriculum and manages its own students and staff.
 
-**Current status: all nine phases complete and verified locally. Not yet deployed.**
+**Current status: all nine phases complete, deployed, and verified in production
+on 2026-09-13.**
 
-The remaining work is deployment, and configuring Cloudinary if photograph uploads are
-wanted. See section 7 for both.
+- Client — https://university-exam-system.vercel.app (Vercel)
+- API — https://ues-api.onrender.com (Render)
+- Database — MongoDB Atlas M0, `ap-south-1`, seeded with the two-college demo data
+- Images — Cloudinary, cloud `jvqvvl3p`; the signed direct upload is **verified live**
+
+No deferred setup remains. Section 9 records the runbook as actually executed, including
+two corrections to what was originally written there.
 
 The complete registration cycle now works end to end: a student fills and submits a form,
 a clerk verifies it or sends it back with a reason, the student corrects and resubmits,
@@ -249,16 +255,16 @@ reviewable place, which is the point of centralising it.
 
 | Phase | Scope | Status |
 |---|---|---|
-| **0** | Foundation, health endpoint, deploy both halves | ✅ **Done (local)** — deploy pending |
-| **1** | Auth, five roles, tenant scoping, seeded demo logins | ✅ **Done (local)** — deploy pending |
-| **2** | University admin: colleges and their admins | ✅ **Done (local)** — deploy pending |
-| **3** | University admin: master syllabus and exam windows | ✅ **Done (local)** — deploy pending |
-| **4** | College admin: people and programmes | ✅ **Done (local)** — deploy pending |
-| **5** | Faculty: semester offerings | ✅ **Done (local)** — deploy pending |
-| **6** | Student: the exam form (the core feature) | ✅ **Done (local)** — deploy pending |
-| **7** | Clerk: verification and student search | ✅ **Done (local)** — deploy pending |
-| **8** | Correction requests (ticketing) with Cloudinary uploads | ✅ **Done (local)** — Cloudinary untested, see below |
-| **9** | Cross-college statistics, lazy loading, hardening | ✅ **Done (local)** — deploy pending |
+| **0** | Foundation, health endpoint, deploy both halves | ✅ **Done and deployed** |
+| **1** | Auth, five roles, tenant scoping, seeded demo logins | ✅ **Done and deployed** |
+| **2** | University admin: colleges and their admins | ✅ **Done and deployed** |
+| **3** | University admin: master syllabus and exam windows | ✅ **Done and deployed** |
+| **4** | College admin: people and programmes | ✅ **Done and deployed** |
+| **5** | Faculty: semester offerings | ✅ **Done and deployed** |
+| **6** | Student: the exam form (the core feature) | ✅ **Done and deployed** |
+| **7** | Clerk: verification and student search | ✅ **Done and deployed** |
+| **8** | Correction requests (ticketing) with Cloudinary uploads | ✅ **Done and deployed** — Cloudinary round trip verified live |
+| **9** | Cross-college statistics, lazy loading, hardening | ✅ **Done and deployed** |
 
 ### Phase 0 — what was actually built
 
@@ -664,30 +670,31 @@ the fix is a comment on the delete list explaining that it must stay exhaustive.
 The orphan state is unreachable in production: `deleteCollege` refuses while a college has
 users. It was purely an artifact of reseeding a development database.
 
-### ⚠️ Cloudinary is implemented but untested
+### Cloudinary — verified in production on 2026-09-13
 
 Photograph uploads use a **signed direct upload**: the browser sends the file straight to
 Cloudinary and the API only signs the request. The file never passes through the server,
 which matters because Render's free tier has no persistent disk.
 
-**Two things are implemented and one is unverified.** The signing endpoint and the
-returned-URL validation are written and covered by tests. The actual round trip to
-Cloudinary has **not** been exercised, because no account is configured on this machine.
+**The round trip is now exercised end to end against the live API.** A signature was
+requested from `/api/uploads/photo-signature` as a student and used to POST an image
+directly to `api.cloudinary.com`; Cloudinary accepted it and stored the file under
+`ues/student-photos`. The signing scheme in `createUploadSignature` is therefore correct,
+not merely plausible.
 
-The three variables are optional together. Without them the API answers
+The three variables remain optional together. Without them the API answers
 `configured: false`, the photo field is hidden, and name and date-of-birth corrections
-work normally. To enable it:
-
-1. Create a free Cloudinary account and copy the cloud name, API key and API secret.
-2. Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`.
-3. Upload a photograph through the student's correction form and confirm the clerk's
-   queue displays it.
+work normally. They are set on Render for cloud `jvqvvl3p`.
 
 **The security detail worth knowing.** The browser uploads directly and then *tells* the
 API where the file landed, so that URL is user-supplied. `isOwnCloudinaryUrl` pins it to
 `res.cloudinary.com`, to our own cloud name, and to our own folder. Without that check a
 student could submit any address on the internet and have the system store and display
 it. That is the classic weakness of a direct-upload flow, and there are tests for it.
+
+Confirmed live on the deployed API: a `photoUrl` on a foreign host was rejected **400**,
+and so was one on the real `res.cloudinary.com` under a *different* cloud name — the case
+a hostname-only check would have let through.
 
 ### Bug found and fixed during Phase 1
 
@@ -702,31 +709,36 @@ now compares the two response bodies directly, so this cannot come back unnotice
 
 ### Phase 0 remaining
 
-- [ ] Create the MongoDB Atlas cluster and put its URI in `server/.env`
-- [ ] Deploy the API to Render
-- [ ] Deploy the client to Vercel, then add the Vercel origin to `CORS_ORIGINS`
-- [ ] Confirm the live client reports **Healthy** against the live API
-- [ ] Version control — **the author's to set up, deliberately not done here** (see below)
+All complete as of 2026-09-13.
 
-### ⚠️ Version control is the author's responsibility
+- [x] Create the MongoDB Atlas cluster and put its URI in `server/.env`
+- [x] Deploy the API to Render
+- [x] Deploy the client to Vercel, then add the Vercel origin to `CORS_ORIGINS`
+- [x] Confirm the live client reports **Healthy** against the live API
+- [x] Version control — `git init`, repo-local identity, pushed to
+      [Jay-Bansode/University-Exam-System](https://github.com/Jay-Bansode/University-Exam-System)
 
-This working copy is **not** a git repository, by request. Before running `git init`,
-note that this machine's global `~/.gitconfig` resolves to:
+### Version control — done 2026-09-13
 
-```
-user.name  = Jaykumar Bansode
-user.email = Jaykumar.Bansode@nextw.com
-```
+Initialised and pushed to
+[Jay-Bansode/University-Exam-System](https://github.com/Jay-Bansode/University-Exam-System)
+(public), branch `main`.
 
-That is an employer address. This is a personal portfolio repository, so set a
-repo-local identity **before the first commit**, or every commit on a public repo will
-carry the employer domain:
+A repo-local identity was set before the first commit, using
+`kumarjay505@gmail.com` rather than the `bansodejay50@` address this section previously
+specified:
 
 ```bash
 git init
 git config user.name  "Jaykumar Bansode"
-git config user.email "bansodejay50@gmail.com"
+git config user.email "kumarjay505@gmail.com"
 ```
+
+**The original warning here is now out of date.** It cautioned that the machine's global
+`~/.gitconfig` resolved to the employer address `Jaykumar.Bansode@nextw.com`. At the time
+of deployment the global identity already read `kumarjay505@gmail.com`, so no employer
+domain was ever at risk. The repo-local identity is set regardless, so this repository
+stays correct even if the global config changes again.
 
 `.gitignore` and `.gitattributes` are already written and correct: `.env` and
 `.env.local` are excluded while the `.env.example` files are tracked, and line endings
@@ -839,16 +851,48 @@ then the other's, to see tenant isolation.
 
 ### Deployment runbook
 
-**Render (API)** — root directory `server`, build `npm install && npm run build`, start
-`npm start`. Set `NODE_ENV=production`, `MONGODB_URI`, and `CORS_ORIGINS` (the Vercel
-URL). Add `0.0.0.0/0` to the Atlas IP access list, since Render does not publish static
-egress IPs on the free tier.
+As executed on 2026-09-13. **Both hosts build from the repository root, not from the
+workspace subdirectory** — see the correction below.
 
-**Vercel (client)** — root directory `client`, framework Vite. Set `VITE_API_BASE_URL` to
-the Render URL. The client is a SPA, so all paths must rewrite to `index.html`.
+**Render (API)** — root directory **blank**, build
+`npm ci --include=dev && npm run build --workspace=@ues/server`, start
+`npm start --workspace=@ues/server`, health check path `/api/health`. Set
+`NODE_ENV=production`, `MONGODB_URI`, `JWT_ACCESS_SECRET`, `SEED_DEMO_PASSWORD`, the three
+`CLOUDINARY_*` variables, and `CORS_ORIGINS` (the Vercel URL). Do not set `PORT`; Render
+injects it. Add `0.0.0.0/0` to the Atlas IP access list, since Render does not publish
+static egress IPs on the free tier.
+
+**Vercel (client)** — root directory **`./`**, framework Vite, build
+`npm run build --workspace=@ues/client`, output directory `client/dist`. Set
+`VITE_API_BASE_URL` to the Render URL. `vercel.json` at the repository root rewrites all
+paths to `index.html`; without it a hard refresh on any nested route 404s.
+
+**⚠️ Why the root directory must not be `server` or `client`.** This was originally
+documented the other way round and does not work. npm 11 *does* resolve the workspace
+correctly from a subdirectory — it walks up to the root lockfile and links `@ues/shared`.
+The problem is narrower: installing from `server/` scopes the install to that one
+workspace (227 packages instead of 383), and **`typescript` is a root devDependency, not
+one of `server`'s**. `tsc` is never installed and the build dies at `prebuild`.
+
+This is easy to miss locally, because a global `typescript` on the developer's machine
+silently satisfies `tsc` — at the wrong version, and absent on the build host. Re-run the
+build with the global npm directory stripped from `PATH` to see the real behaviour.
 
 **The order matters.** Deploy the API first, then the client with the API URL, then add
 the Vercel origin to the API's `CORS_ORIGINS` and redeploy the API.
+
+**Seeding Atlas.** Run `npm run seed` from a developer machine with `server/.env`
+temporarily pointed at the Atlas URI; the seed runs through `tsx`, a devDependency, and is
+not intended to run on Render. `SEED_DEMO_PASSWORD` must then match on Render, because
+`/api/auth/demo-accounts` serves that value to the login page — a mismatch publishes
+credentials that silently do not work.
+
+**⚠️ `mongodb+srv://` may fail from a developer machine.** If Node reports
+`querySrv ECONNREFUSED` while `nslookup` resolves the same name, Node's resolver is
+pointed somewhere that cannot answer SRV queries (check `require('dns').getServers()`).
+Render is unaffected. Locally, use the non-SRV form — the shard hosts plus
+`?ssl=true&replicaSet=…&authSource=admin` — which resolves through the OS resolver
+instead.
 
 ---
 
@@ -1348,3 +1392,28 @@ Render cold start and explain the delay rather than appearing broken.
 - Test suite grew from 215 to 230.
 - **All nine phases complete.** Remaining work is deployment and optional Cloudinary
   configuration.
+
+### 2026-09-13 — Deployment
+
+- **Deployed.** Client on Vercel (`university-exam-system.vercel.app`), API on Render
+  (`ues-api.onrender.com`), MongoDB Atlas M0 in `ap-south-1`, Cloudinary for photographs.
+- Version control initialised and pushed to
+  [Jay-Bansode/University-Exam-System](https://github.com/Jay-Bansode/University-Exam-System),
+  with a repo-local identity set before the first commit.
+- Added `vercel.json` at the repository root so SPA routes survive a hard refresh.
+- **Corrected the deployment runbook in section 9.** It specified root directory `server`
+  for Render, which cannot work: installing from a workspace subdirectory omits the root
+  `typescript` devDependency, so `tsc` is missing at build time. A global TypeScript on
+  the developer machine had been masking this. Both hosts now build from the repository
+  root with `--workspace` flags. Verified on a clean tree with `PATH` stripped of the
+  global npm directory.
+- **Cloudinary is no longer untested.** A signature from `/api/uploads/photo-signature`
+  was used to upload directly to Cloudinary, which accepted it and stored the file under
+  `ues/student-photos`. The `isOwnCloudinaryUrl` guard was confirmed live: a foreign host
+  was rejected 400, and so was the real `res.cloudinary.com` under a different cloud name.
+- Verified in production: health and database connectivity, CORS from the Vercel origin,
+  login returning `HttpOnly; Secure; SameSite=None` on the refresh cookie, and tenant
+  isolation answering **404** rather than 403 across colleges.
+- Recorded a developer-machine caveat: Node's resolver here cannot answer SRV queries, so
+  `mongodb+srv://` fails locally with `querySrv ECONNREFUSED` while `nslookup` succeeds.
+  Seeding used the non-SRV connection string. Render is unaffected.

@@ -7,7 +7,9 @@ The university publishes a central curriculum and controls when exam registratio
 Each affiliated college teaches that curriculum and manages its own students and staff,
 and no college can see another college's data.
 
-> **Live demo:** _pending first deployment_
+> **Live demo:** **https://university-exam-system.vercel.app**
+> — sign in from the demo panel; no account needed.
+> The API sleeps after 15 minutes idle, so the first request may take up to a minute.
 
 ---
 
@@ -75,9 +77,16 @@ tracker, and the deployment runbook.
 
 ## Status
 
-**All nine phases complete**, 230 tests passing. Not yet deployed — that and optional
-Cloudinary configuration are the remaining work. See the phase tracker in
-[PROJECT.md](PROJECT.md#7-phase-tracker).
+**All nine phases complete and deployed**, 230 tests passing. Photograph uploads are
+configured and the Cloudinary round trip is verified in production. See the phase tracker
+in [PROJECT.md](PROJECT.md#7-phase-tracker).
+
+| Piece | Where |
+|---|---|
+| Client | [university-exam-system.vercel.app](https://university-exam-system.vercel.app) (Vercel) |
+| API | [ues-api.onrender.com](https://ues-api.onrender.com/api/health) (Render) |
+| Database | MongoDB Atlas M0, Mumbai |
+| Images | Cloudinary, signed direct upload |
 
 ### How an exam form comes to exist
 
