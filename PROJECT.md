@@ -17,7 +17,7 @@ each affiliated college teaches that curriculum and manages its own students and
 **Current status: all nine phases complete, deployed, and verified in production
 on 2026-09-13.**
 
-- Client — https://university-exam-system.vercel.app (Vercel)
+- Client — https://university-exam-system-one.vercel.app (Vercel)
 - API — https://ues-api.onrender.com (Render)
 - Database — MongoDB Atlas M0, `ap-south-1`, seeded with the two-college demo data
 - Images — Cloudinary, cloud `jvqvvl3p`; the signed direct upload is **verified live**
@@ -867,6 +867,18 @@ static egress IPs on the free tier.
 `VITE_API_BASE_URL` to the Render URL. `vercel.json` at the repository root rewrites all
 paths to `index.html`; without it a hard refresh on any nested route 404s.
 
+**⚠️ Turn off Vercel Deployment Protection.** New Hobby projects enable *Vercel
+Authentication* by default, which 302-redirects every visitor to `vercel.com/login`. The
+site looks fine to the signed-in owner and is a login wall to everyone else — fatal for a
+portfolio link. Settings → Deployment Protection → Vercel Authentication → Disabled.
+
+**⚠️ Confirm which project a URL actually serves.** If the obvious project name is already
+taken in the account, Vercel silently assigns a different domain, and the old project keeps
+answering on the name you expected. Verify by comparing the served `<title>` against
+`client/dist/index.html` rather than by eye, and confirm `VITE_API_BASE_URL` is really
+compiled in by grepping the deployed `assets/client-*.js` chunk for the API host. The
+production URL is `https://university-exam-system-one.vercel.app`.
+
 **⚠️ Why the root directory must not be `server` or `client`.** This was originally
 documented the other way round and does not work. npm 11 *does* resolve the workspace
 correctly from a subdirectory — it walks up to the root lockfile and links `@ues/shared`.
@@ -1395,7 +1407,7 @@ Render cold start and explain the delay rather than appearing broken.
 
 ### 2026-09-13 — Deployment
 
-- **Deployed.** Client on Vercel (`university-exam-system.vercel.app`), API on Render
+- **Deployed.** Client on Vercel (`university-exam-system-one.vercel.app`), API on Render
   (`ues-api.onrender.com`), MongoDB Atlas M0 in `ap-south-1`, Cloudinary for photographs.
 - Version control initialised and pushed to
   [Jay-Bansode/University-Exam-System](https://github.com/Jay-Bansode/University-Exam-System),
@@ -1417,3 +1429,17 @@ Render cold start and explain the delay rather than appearing broken.
 - Recorded a developer-machine caveat: Node's resolver here cannot answer SRV queries, so
   `mongodb+srv://` fails locally with `querySrv ECONNREFUSED` while `nslookup` succeeds.
   Seeding used the non-SRV connection string. Render is unaffected.
+
+### 2026-09-13 — Deployment corrections
+
+- **Corrected the recorded client URL.** The first verification matched the deployed
+  `<title>` by eye and landed on `university-exam-system.vercel.app`, which is a *different,
+  pre-existing project* in the same Vercel account. The real deployment is
+  `https://university-exam-system-one.vercel.app`. Verification now compares against
+  `client/dist/index.html` and greps the deployed chunk for the compiled API host.
+- **Disabled Vercel Deployment Protection.** It is on by default for new Hobby projects and
+  had been redirecting every visitor to `vercel.com/login`.
+- `CORS_ORIGINS` corrected on Render to the real origin; it had been allowing the old
+  project's domain and blocking the actual client.
+- Confirmed the production bundle compiles in `https://ues-api.onrender.com` with
+  `withCredentials`, and contains no `localhost:5000` fallback.
