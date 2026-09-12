@@ -1,0 +1,42 @@
+{
+  "name": "@ues/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "scripts": {
+    "predev": "npm run build --workspace=@ues/shared",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
+    "prebuild": "npm run build --workspace=@ues/shared",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "seed": "tsx --env-file-if-exists=.env src/seed/index.ts"
+  },
+  "dependencies": {
+    "@ues/shared": "*",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.9.5",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.4.1",
+    "@types/supertest": "^6.0.3",
+    "mongodb-memory-server": "^11.2.0",
+    "supertest": "^7.1.4",
+    "tsx": "^4.23.13",
+    "vitest": "^5.0.0"
+  }
+}

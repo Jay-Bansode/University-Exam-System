@@ -1,0 +1,33 @@
+# Local MongoDB for development only. Production uses MongoDB Atlas.
+#
+#   docker compose up -d      start
+#   docker compose down       stop, keeping data
+#   docker compose down -v    stop and delete all data
+#
+# Running as a single-node replica set rather than a standalone server: Mongo only
+# supports transactions and change streams on a replica set, and Atlas is always one.
+# Matching that locally avoids code that works in development and fails in production.
+
+services:
+  mongo:
+    image: mongo:8
+    container_name: ues-mongo
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # Initiates the replica set on first boot, then reports healthy once it responds.
+      test: |
+        mongosh --quiet --eval "
+          try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }
+        "
+      interval: 5s
+      timeout: 10s
+      start_period: 20s
+      retries: 20
+
+volumes:
+  mongo-data:

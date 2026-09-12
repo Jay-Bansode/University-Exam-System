@@ -1,0 +1,12 @@
+# Normalize line endings so the repo is identical on Windows, macOS, and the Linux
+# build containers on Render and Vercel. Without this, a Windows checkout commits CRLF
+# and every file looks modified on another machine.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary

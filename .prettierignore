@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+.claude/
+
+# Markdown is hand-wrapped for readability; Prettier would reflow the tables.
+*.md
